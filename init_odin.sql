@@ -1,7 +1,6 @@
 create extension dblink;
 
 
-
 CREATE OR REPLACE FUNCTION give_grant_table()
     RETURNS trigger
     LANGUAGE plpgsql
@@ -12,27 +11,44 @@ DECLARE
     v_hosts text[];
     v_host  text;
 BEGIN
-    if NEW.parameters IS NOT NULL then
-        NEW.parameters = 'WITH ' || NEW.parameters;
-    else
-        NEW.parameters = '';
-    end if;
     v_hosts = regexp_split_to_array(
             trim(NEW.host),
             '\s+');
+    if upper(NEW.option) = 'GRANT' then
 
-    foreach v_host in ARRAY v_hosts
-        LOOP
+        if NEW.parameters IS NOT NULL then
+            NEW.parameters = ' WITH ' || NEW.parameters;
+        else
+            NEW.parameters = '';
+        end if;
 
-            select n_info
-            into info
-            from dblink(
-                         'host=' || v_host ||
-                         ' user=' || NEW.n_user || ' password=' || NEW.n_password || ' dbname=' || NEW.n_database,
-                         'GRANT ' || NEW.n_grant_to_user || ' TO ' || NEW.n_user_target || ';'
-                 ) as (n_info text);
 
-        end loop;
+        foreach v_host in ARRAY v_hosts
+            LOOP
+
+                select n_info
+                into info
+                from dblink(
+                             'host=' || v_host ||
+                             ' user=' || NEW.n_user || ' password=' || NEW.n_password || ' dbname=' || NEW.n_database,
+                             'GRANT ' || NEW.n_grant_to_user || ' TO ' || NEW.n_user_target || NEW.parameters || ';'
+                     ) as (n_info text);
+            end loop;
+
+    elsif upper(NEW.option) = 'CREATE' then
+        foreach v_host in ARRAY v_hosts
+            LOOP
+
+                select n_info
+                into info
+                from dblink(
+                             'host=' || v_host ||
+                             ' user=' || NEW.n_user || ' password=' || NEW.n_password || ' dbname=' || NEW.n_database,
+                             'CREATE ROLE ' || NEW.n_user_target || NEW.parameters || ';'
+                     ) as (n_info text);
+            end loop;
+
+    end if;
 
 
     RAISE INFO '%', info;
@@ -40,6 +56,7 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
 
 CREATE TRIGGER trg_server_insert
     AFTER INSERT
@@ -65,11 +82,4 @@ BEGIN
     RAISE INFO '%', info;
 END;
 $$;
-
-call judgment(p_host := 'db3.edi.prod.lan',
-              p_db := 'coreplat_db',
-              p_comand := 'select 2;
-select 3;
-select 5;',
-              p_user := 'nikitata');
 
