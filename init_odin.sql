@@ -1,10 +1,9 @@
 create extension dblink;
 
 
-CREATE OR REPLACE FUNCTION give_grant_table()
-    RETURNS trigger
-    LANGUAGE plpgsql
-AS
+create function give_grant_table() returns trigger
+    language plpgsql
+as
 $$
 DECLARE
     info    text;
@@ -19,7 +18,7 @@ BEGIN
         if NEW.parameters IS NOT NULL then
             NEW.parameters = ' WITH ' || NEW.parameters;
         else
-            NEW.parameters = '';
+            NEW.parameters = ' ';
         end if;
 
 
@@ -44,7 +43,7 @@ BEGIN
                 from dblink(
                              'host=' || v_host ||
                              ' user=' || NEW.n_user || ' password=' || NEW.n_password || ' dbname=' || NEW.n_database,
-                             'CREATE ROLE ' || NEW.n_user_target || NEW.parameters || ';'
+                             'CREATE ROLE ' || NEW.n_user_target ||' '|| NEW.parameters || ';'
                      ) as (n_info text);
             end loop;
 
@@ -56,6 +55,10 @@ BEGIN
     RETURN NEW;
 END;
 $$;
+
+alter function give_grant_table() owner to postgres;
+
+
 
 
 CREATE TRIGGER trg_server_insert
